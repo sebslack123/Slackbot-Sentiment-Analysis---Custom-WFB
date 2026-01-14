@@ -1,0 +1,118 @@
+{
+  "display_information": {
+    "name": "Social Listening Report",
+    "description": "Automated social listening and brand sentiment analysis using Claude AI with web search capabilities",
+    "background_color": "#4A154B"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "SocialListening",
+      "always_online": false
+    }
+  },
+  "functions": {
+    "social_listening_report": {
+      "title": "Social Listening Report",
+      "description": "Perform automated social listening and brand sentiment analysis using Claude AI",
+      "input_parameters": {
+        "brand_or_product": {
+          "type": "string",
+          "title": "Brand/Product Name",
+          "description": "The brand or product to monitor (e.g., 'Slackbot')",
+          "is_required": true
+        },
+        "competitors": {
+          "type": "string",
+          "title": "Competitors",
+          "description": "Optional: Comma-separated list of competitors for comparison",
+          "is_required": false
+        },
+        "time_range": {
+          "type": "string",
+          "title": "Time Range",
+          "description": "Optional: e.g., '7 days', '24 hours', '30 days' (defaults to '7 days')",
+          "is_required": false
+        },
+        "platforms": {
+          "type": "string",
+          "title": "Platforms to Monitor",
+          "description": "Optional: Comma-separated (e.g., 'LinkedIn, Reddit, X/Twitter')",
+          "is_required": false
+        }
+      },
+      "output_parameters": {
+        "sentiment_summary": {
+          "type": "string",
+          "title": "Sentiment Breakdown",
+          "description": "Overall sentiment distribution with percentages",
+          "is_required": true
+        },
+        "positive_highlights": {
+          "type": "string",
+          "title": "Positive Feedback",
+          "description": "Key positive mentions and praise",
+          "is_required": true
+        },
+        "negative_concerns": {
+          "type": "string",
+          "title": "Negative Feedback",
+          "description": "Critical issues and complaints requiring attention",
+          "is_required": true
+        },
+        "trending_topics": {
+          "type": "string",
+          "title": "Trending Topics",
+          "description": "Most discussed themes and feature requests",
+          "is_required": true
+        },
+        "competitive_insights": {
+          "type": "string",
+          "title": "Competitive Mentions",
+          "description": "How the product is being compared to competitors",
+          "is_required": true
+        },
+        "full_report": {
+          "type": "string",
+          "title": "Complete Report",
+          "description": "Full markdown-formatted social listening report",
+          "is_required": true
+        },
+        "has_critical_issues": {
+          "type": "string",
+          "title": "Has Critical Issues",
+          "description": "Boolean flag (true/false) for conditional workflow logic",
+          "is_required": true
+        },
+        "report_timestamp": {
+          "type": "string",
+          "title": "Report Generated At",
+          "description": "ISO timestamp of report generation",
+          "is_required": true
+        }
+      }
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.public",
+        "channels:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "function_executed"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    },
+    "org_deploy_enabled": true,
+    "socket_mode_enabled": true,
+    "function_runtime": "remote",
+    "token_rotation_enabled": false
+  }
+}

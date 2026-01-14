@@ -1,0 +1,27 @@
+{
+  "name": "social-listening-slack-app",
+  "version": "1.0.0",
+  "description": "Slack Workflow Builder custom step for automated social listening and brand sentiment analysis using Claude AI",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "NODE_ENV=development node app.js"
+  },
+  "keywords": [
+    "slack",
+    "workflow",
+    "social-listening",
+    "sentiment-analysis",
+    "claude-ai",
+    "brand-monitoring"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/bolt": "^3.17.1",
+    "@slack/socket-mode": "^2.0.5",
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  }
+}
