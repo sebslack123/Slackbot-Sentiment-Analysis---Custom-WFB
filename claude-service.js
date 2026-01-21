@@ -1,4 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { searchReddit } = require('./reddit-service');
+const { searchBing } = require('./search-service');
+const { aggregateResults } = require('./data-aggregator');
 
 class SocialListeningService {
   constructor(apiKey) {
@@ -16,27 +19,50 @@ class SocialListeningService {
       console.log(`Starting social listening analysis for: ${brand}`);
       console.log(`Time range: ${timeRange}, Platforms: ${platforms}`);
 
-      const prompt = this.buildSocialListeningPrompt(brand, competitors, timeRange, platforms);
+      // Try to fetch real-time data from APIs
+      let useRealData = false;
+      let aggregatedData = null;
 
-      const message = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      });
+      try {
+        console.log('🚀 Fetching real-time data from Reddit and Bing APIs...');
 
-      console.log('Claude response received, processing...');
+        // Fetch data from Reddit and Bing in parallel
+        const [redditData, bingData] = await Promise.all([
+          searchReddit(brand, timeRange),
+          searchBing(brand, platforms)
+        ]);
 
-      let fullResponse = '';
-      for (const content of message.content) {
-        if (content.type === 'text') {
-          fullResponse += content.text;
+        console.log(`📊 Reddit: ${redditData.posts.length} posts`);
+        console.log(`📊 Bing: ${bingData.totalResults} results`);
+
+        // Aggregate the results
+        aggregatedData = aggregateResults(redditData, bingData, brand, timeRange);
+
+        // Check if we have enough real data to use
+        if (aggregatedData.aggregateStats.totalSources > 0) {
+          useRealData = true;
+          console.log('✅ Using real-time API data for analysis');
+        } else {
+          console.log('⚠️ No real-time data found, falling back to Claude knowledge');
         }
+
+      } catch (apiError) {
+        console.error('⚠️ API fetch error, falling back to Claude knowledge:', apiError.message);
+        useRealData = false;
       }
 
-      return this.parseResponse(fullResponse);
+      // Choose analysis method based on data availability
+      let analysisResult;
+      if (useRealData && aggregatedData) {
+        analysisResult = await this.analyzeWithRealData(brand, competitors, timeRange, platforms, aggregatedData);
+      } else {
+        analysisResult = await this.analyzeWithClaudeKnowledge(brand, competitors, timeRange, platforms);
+      }
+
+      // Add data source indicator
+      analysisResult.dataSource = aggregatedData ? aggregatedData.dataSource : 'fallback';
+
+      return analysisResult;
 
     } catch (error) {
       console.error('Error in analyzeBrandSentiment:', error);
@@ -49,9 +75,156 @@ class SocialListeningService {
         competitiveInsights: '',
         fullReport: `# Social Listening Analysis Error\n\n**Error:** ${error.message}\n\n**Time:** ${new Date().toISOString()}`,
         hasCriticalIssues: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        dataSource: 'error'
       };
     }
+  }
+
+  async analyzeWithRealData(brand, competitors, timeRange, platforms, aggregatedData) {
+    console.log('📝 Building enhanced prompt with real API data...');
+
+    const prompt = this.buildEnhancedPrompt(brand, competitors, timeRange, platforms, aggregatedData);
+
+    const message = await this.client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    console.log('Claude response received, processing...');
+
+    let fullResponse = '';
+    for (const content of message.content) {
+      if (content.type === 'text') {
+        fullResponse += content.text;
+      }
+    }
+
+    const parsed = this.parseResponse(fullResponse);
+
+    // Add data source note to full report
+    parsed.fullReport = `# Social Listening Report (Real-Time Data)\n\n` +
+      `**Data Source:** ${aggregatedData.dataSource === 'real-time' ? '✅ Real-time API data' : '⚠️ Partial API data'}\n` +
+      `**Sources:** ${aggregatedData.aggregateStats.totalSources} mentions across ${aggregatedData.aggregateStats.platforms.join(', ')}\n` +
+      `**Brand:** ${brand}\n` +
+      `**Time Range:** ${timeRange}\n` +
+      `**Generated:** ${new Date().toISOString()}\n\n` +
+      `---\n\n` +
+      fullResponse;
+
+    return parsed;
+  }
+
+  async analyzeWithClaudeKnowledge(brand, competitors, timeRange, platforms) {
+    console.log('📝 Using Claude knowledge fallback (no real-time data)...');
+
+    const prompt = this.buildSocialListeningPrompt(brand, competitors, timeRange, platforms);
+
+    const message = await this.client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    console.log('Claude response received, processing...');
+
+    let fullResponse = '';
+    for (const content of message.content) {
+      if (content.type === 'text') {
+        fullResponse += content.text;
+      }
+    }
+
+    const parsed = this.parseResponse(fullResponse);
+
+    // Add fallback note to full report
+    parsed.fullReport = `# Social Listening Report (Training Data Fallback)\n\n` +
+      `**Data Source:** ⚠️ Using Claude training data (API data unavailable)\n` +
+      `**Brand:** ${brand}\n` +
+      `**Time Range:** ${timeRange}\n` +
+      `**Generated:** ${new Date().toISOString()}\n\n` +
+      `---\n\n` +
+      fullResponse;
+
+    return parsed;
+  }
+
+  buildEnhancedPrompt(brand, competitors, timeRange, platforms, aggregatedData) {
+    const today = new Date().toISOString().split('T')[0];
+
+    return `You are a social listening and brand monitoring specialist analyzing REAL data collected from APIs.
+
+**Brand to Monitor:** ${brand}
+${competitors ? `**Competitors for Comparison:** ${competitors}` : ''}
+**Time Range:** Last ${timeRange}
+**Platforms Analyzed:** ${aggregatedData.aggregateStats.platforms.join(', ')}
+
+====================================
+REAL DATA COLLECTED FROM APIS:
+====================================
+
+${aggregatedData.formattedForClaude}
+
+====================================
+
+**CRITICAL OUTPUT FORMAT REQUIREMENTS:**
+
+Your output MUST be concise and crisp for Slack channel posting. Follow these rules EXACTLY:
+
+1. **EXACTLY 3 bullet points per section** (no more, no less)
+2. **Use bullet point symbol (•)** not numbers or dashes
+3. **Each bullet: maximum 1-2 sentences**
+4. **ALWAYS include source citation** from the REAL data above - use actual URLs provided
+5. **Total output must be under 250 words**
+6. **Prioritize top 3 most impactful insights per section**
+
+**Output Format - Structure your analysis EXACTLY as follows:**
+
+📊 **SENTIMENT BREAKDOWN**
+• [Percentage breakdown: X% positive, Y% neutral, Z% negative with total volume from REAL data]
+• [Overall trend: improving/stable/declining based on engagement and scores from REAL data]
+• [Key sentiment drivers: what's driving the sentiment with actual sources from data]
+
+✅ **POSITIVE HIGHLIGHTS**
+• [Concise positive highlight #1 with specific detail] (source: [actual URL from data above])
+• [Concise positive highlight #2 with specific detail] (source: [actual URL from data above])
+• [Concise positive highlight #3 with specific detail] (source: [actual URL from data above])
+
+⚠️ **CRITICAL CONCERNS**
+• [Severity level]: [Concise concern #1 with impact] (source: [actual URL from data above])
+• [Severity level]: [Concise concern #2 with impact] (source: [actual URL from data above])
+• [Severity level]: [Concise concern #3 with impact] (source: [actual URL from data above])
+[Note: If no critical concerns exist, format as: • No critical issues identified in monitoring period (source: comprehensive review)]
+
+🔥 **TRENDING TOPICS**
+• [Topic #1]: [Brief context and why it matters] ([X mentions, source: platform])
+• [Topic #2]: [Brief context and why it matters] ([X mentions, source: platform])
+• [Topic #3]: [Brief context and why it matters] ([X mentions, source: platform])
+
+🎯 **COMPETITIVE INSIGHTS**
+• [Competitive insight #1 comparing to specific competitor] (source: [actual URL from data above])
+• [Competitive insight #2 comparing to specific competitor] (source: [actual URL from data above])
+• [Competitive insight #3 comparing to specific competitor] (source: [actual URL from data above])
+
+**MANDATORY FORMAT RULES:**
+- Do NOT add any sections beyond these 5
+- Do NOT use numbered lists (1, 2, 3) - only bullet symbols (•)
+- Do NOT exceed 3 bullets per section under any circumstances
+- Do NOT fabricate sources - only use URLs from the REAL data provided above
+- Do NOT write paragraphs - keep to 1-2 sentences maximum per bullet
+- Target ~220 words total for ideal readability
+
+**Current Date:** ${today}
+**Analysis Focus:** ${aggregatedData.aggregateStats.totalSources} real sources from last ${timeRange}
+
+Provide your analysis based ONLY on the real data above.`;
   }
 
   buildSocialListeningPrompt(brand, competitors, timeRange, platforms) {
